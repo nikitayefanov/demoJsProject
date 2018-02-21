@@ -1,17 +1,18 @@
 package com.yefanov.service;
 
-import org.springframework.http.HttpStatus;
+import com.yefanov.entities.ScriptEntity;
 
-import javax.script.ScriptException;
-import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
 public interface ScriptService {
 
-    String executeScript(String script) throws ScriptException, IOException, Exception;
+    ScriptEntity getScriptEntityById(int id);
 
-    CompletableFuture<String> executeScriptAsync(String script);
+    String executeScript(ScriptEntity script);
 
-    HttpStatus cancelScript(long id);
+    CompletableFuture<String> executeScriptAsync(ScriptEntity script);
+
+    boolean cancelScript(int id);
 
 }

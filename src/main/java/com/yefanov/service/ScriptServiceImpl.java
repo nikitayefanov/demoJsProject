@@ -1,10 +1,11 @@
 package com.yefanov.service;
 
+import com.yefanov.entities.ScriptEntity;
+import com.yefanov.entities.ScriptStatus;
 import com.yefanov.storage.ScriptStorage;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.apache.commons.io.output.WriterOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +13,8 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.*;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -21,45 +24,70 @@ public class ScriptServiceImpl implements ScriptService {
     private ScriptStorage storage;
 
     @Override
-    public String executeScript(String script) throws Exception {
+    public ScriptEntity getScriptEntityById(int id) {
+        return storage.getScript(id);
+    }
+
+    @Override
+    public String executeScript(ScriptEntity entity) {
+        storage.addScript(entity);
         ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-        PrintStream console = System.out;
         try (Writer stringWriter = new StringWriter()){
-            OutputStream output = new TeeOutputStream(console, new WriterOutputStream(stringWriter, Charset.defaultCharset()));
-            engine.getContext().setWriter(new OutputStreamWriter(output));
-            engine.eval(script);
+            OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.defaultCharset()), System.out);
+            engine.getContext().setWriter(new OutputStreamWriter(outputStream));
+            engine.eval(entity.getScript());
+            String consoleOutput = stringWriter.toString();
+            entity.setResult(consoleOutput);
+            entity.setStatus(ScriptStatus.DONE);
             return stringWriter.toString();
+        } catch (Exception e) {
+            entity.setStatus(ScriptStatus.COMPLETED_EXCEPTIONALLY);
+            entity.setThrownException(e);
+            return e.getMessage();
         }
     }
 
     @Async
     @Override
-    public CompletableFuture<String> executeScriptAsync(String script) {
+    public CompletableFuture<String> executeScriptAsync(ScriptEntity script) {
         CompletableFuture<String> result = new CompletableFuture<>();
-        try {
-            result.complete(executeScript(script));
-        } catch (Exception e) {
-            result.completeExceptionally(e);
-        }
+        script.setFuture(result);
+        result.complete(executeScript(script));
         return result;
     }
 
     @Override
-    public HttpStatus cancelScript(long id) {
-        Object script;
-        try {
-            script = storage.getScript(id);
-        } catch (IndexOutOfBoundsException e) {
-            return HttpStatus.NOT_FOUND;
-        }
-        if (script instanceof String) {
-            return HttpStatus.NOT_ACCEPTABLE;
-        } else if (script instanceof CompletableFuture) {
-            CompletableFuture<String> future = (CompletableFuture<String>) script;
+    public boolean cancelScript(int id) {
+        ScriptEntity script = storage.getScript(id);
+        if (script.getResult() != null) {
+            return false;
+        } else {
+            CompletableFuture<String> future = script.getFuture();
             future.cancel(true);
-            return HttpStatus.OK;
+            script.setStatus(ScriptStatus.CANCELLED);
+            return true;
         }
-        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
+
+//    @Override
+//    public boolean addOutputStream(OutputStream outputStream) {
+//        return outputStreams.add(outputStream);
+//    }
+
+//    @Override
+//    public OutputStream createOutputStream() {
+//        if (outputStreams.size() == 1) {
+//            return outputStreams.get(0);
+//        } else if (outputStreams.size() == 2) {
+//            return new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
+//        } else {
+//            OutputStream result = new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
+//            for (int i = 2; i < outputStreams.size(); i++) {
+//                result = new TeeOutputStream(result, outputStreams.get(i));
+//            }
+//            return result;
+//        }
+//        return new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
+//    }
 
 }

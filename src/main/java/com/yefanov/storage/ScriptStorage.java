@@ -1,37 +1,12 @@
 package com.yefanov.storage;
 
-import org.springframework.stereotype.Component;
+import com.yefanov.entities.ScriptEntity;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+public interface ScriptStorage {
 
-@Component
-public class ScriptStorage {
+    public boolean addScript(ScriptEntity script);
 
-    private List<Object> scripts = new CopyOnWriteArrayList<>();
+    public void removeScript(ScriptEntity script);
 
-    public long addScript(Object script) {
-        for (int i = 0; i < scripts.size(); i++) {
-            if (scripts.get(i) == null) {
-                scripts.set(i, script);
-                return i;
-            }
-        }
-        scripts.add(script);
-        return scripts.size() - 1;
-    }
-
-    public boolean removeScript(Object script) {
-        for (int i = 0; i < scripts.size(); i++) {
-            if (scripts.get(i).equals(script)) {
-                scripts.set(i, null);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public Object getScript(Long id) {
-        return scripts.get(id.intValue());
-    }
+    public ScriptEntity getScript(int id);
 }
