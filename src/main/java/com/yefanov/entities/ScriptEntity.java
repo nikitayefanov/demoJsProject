@@ -1,5 +1,8 @@
 package com.yefanov.entities;
 
+import org.apache.commons.io.output.TeeOutputStream;
+
+import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
 public class ScriptEntity {
@@ -15,6 +18,8 @@ public class ScriptEntity {
     private ScriptStatus status;
 
     private Exception thrownException;
+
+    private OutputStream outputStream;
 
     public ScriptEntity() {
         this.status = ScriptStatus.RUNNING;
@@ -71,5 +76,13 @@ public class ScriptEntity {
 
     public void setThrownException(Exception thrownException) {
         this.thrownException = thrownException;
+    }
+
+    public OutputStream getOutputStream() {
+        return outputStream;
+    }
+
+    public void setOutputStream(OutputStream outputStream) {
+        this.outputStream = outputStream;
     }
 }

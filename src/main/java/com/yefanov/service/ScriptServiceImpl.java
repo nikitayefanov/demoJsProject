@@ -11,17 +11,26 @@ import org.springframework.stereotype.Service;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
-import java.io.*;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ScriptServiceImpl implements ScriptService {
 
+    public static final String CHARSET = "UTF-8";
+    public static final String ENGINE_NAME = "nashorn";
+
     @Autowired
     private ScriptStorage storage;
+
+    @Override
+    public ScriptEntity addScriptToStorage(String script) {
+        return storage.addScript(script);
+    }
 
     @Override
     public ScriptEntity getScriptEntityById(int id) {
@@ -30,11 +39,12 @@ public class ScriptServiceImpl implements ScriptService {
 
     @Override
     public String executeScript(ScriptEntity entity) {
-        storage.addScript(entity);
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
         try (Writer stringWriter = new StringWriter()){
-            OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.defaultCharset()), System.out);
-            engine.getContext().setWriter(new OutputStreamWriter(outputStream));
+            OutputStream output = entity.getOutputStream() == null ? System.out : entity.getOutputStream();
+//            OutputStream output = entity.getOutputStream();
+            OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.forName(CHARSET)), output);
+            engine.getContext().setWriter(new OutputStreamWriter(outputStream, Charset.forName(CHARSET)));
             engine.eval(entity.getScript());
             String consoleOutput = stringWriter.toString();
             entity.setResult(consoleOutput);
@@ -68,26 +78,4 @@ public class ScriptServiceImpl implements ScriptService {
             return true;
         }
     }
-
-//    @Override
-//    public boolean addOutputStream(OutputStream outputStream) {
-//        return outputStreams.add(outputStream);
-//    }
-
-//    @Override
-//    public OutputStream createOutputStream() {
-//        if (outputStreams.size() == 1) {
-//            return outputStreams.get(0);
-//        } else if (outputStreams.size() == 2) {
-//            return new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
-//        } else {
-//            OutputStream result = new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
-//            for (int i = 2; i < outputStreams.size(); i++) {
-//                result = new TeeOutputStream(result, outputStreams.get(i));
-//            }
-//            return result;
-//        }
-//        return new TeeOutputStream(outputStreams.get(0), outputStreams.get(1));
-//    }
-
 }

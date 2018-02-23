@@ -7,6 +7,8 @@ import java.util.concurrent.CompletableFuture;
 
 public interface ScriptService {
 
+    ScriptEntity addScriptToStorage(String script);
+
     ScriptEntity getScriptEntityById(int id);
 
     String executeScript(ScriptEntity script);

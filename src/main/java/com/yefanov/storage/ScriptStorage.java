@@ -4,7 +4,7 @@ import com.yefanov.entities.ScriptEntity;
 
 public interface ScriptStorage {
 
-    public boolean addScript(ScriptEntity script);
+    public ScriptEntity addScript(String script);
 
     public void removeScript(ScriptEntity script);
 

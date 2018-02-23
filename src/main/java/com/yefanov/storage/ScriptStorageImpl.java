@@ -9,13 +9,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Component
 public class ScriptStorageImpl implements ScriptStorage  {
 
-    List<ScriptEntity> scripts = new CopyOnWriteArrayList<>();
+    private List<ScriptEntity> scripts = new CopyOnWriteArrayList<>();
 
     @Override
-    public boolean addScript(ScriptEntity script) {
-        boolean res = scripts.add(script);
+    public ScriptEntity addScript(String s) {
+        ScriptEntity script = new ScriptEntity(s);
+        scripts.add(script);
         script.setId(scripts.size() - 1);
-        return res;
+        return script;
     }
 
     @Override
