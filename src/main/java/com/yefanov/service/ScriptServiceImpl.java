@@ -42,7 +42,6 @@ public class ScriptServiceImpl implements ScriptService {
         ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
         try (Writer stringWriter = new StringWriter()){
             OutputStream output = entity.getOutputStream() == null ? System.out : entity.getOutputStream();
-//            OutputStream output = entity.getOutputStream();
             OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.forName(CHARSET)), output);
             engine.getContext().setWriter(new OutputStreamWriter(outputStream, Charset.forName(CHARSET)));
             engine.eval(entity.getScript());

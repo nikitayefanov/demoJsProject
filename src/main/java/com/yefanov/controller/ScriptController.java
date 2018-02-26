@@ -11,11 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.concurrent.ExecutionException;
 
 import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
 
@@ -40,7 +37,7 @@ public class ScriptController {
             method = RequestMethod.POST,
             produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<StreamingResponseBody> addScript(@RequestBody String body,
-                                            @RequestParam(value = "async", defaultValue = "false") boolean async
+                                                           @RequestParam(value = "async", defaultValue = "false") boolean async
 
     ) throws URISyntaxException {
         if (body.isEmpty()) {
@@ -71,14 +68,12 @@ public class ScriptController {
      * 406(NOT_ACCEPTABLE) - script has been completed exceptionally
      * 204 - script is still evaluating
      * 500(INTERNAL_SERVER_ERROR - server error
-     * @throws ExecutionException
-     * @throws InterruptedException
      */
     @RequestMapping(
             value = "/scripts/{id}",
             method = RequestMethod.GET
     )
-    public ResponseEntity getStatus(@PathVariable("id") int id) throws ExecutionException, InterruptedException {
+    public ResponseEntity getStatus(@PathVariable("id") int id) {
         ScriptEntity entity = scriptService.getScriptEntityById(id);
         switch (entity.getStatus()) {
             case RUNNING:
@@ -111,41 +106,41 @@ public class ScriptController {
         }
     }
 
-    @RequestMapping(
-            value = "/test",
-            method = RequestMethod.GET,
-            produces = MediaType.TEXT_PLAIN_VALUE
-    )
-    public ResponseEntity<StreamingResponseBody> test(OutputStream stream) {
-        StreamingResponseBody body = new StreamingResponseBody() {
-            @Override
-            public void writeTo(OutputStream outputStream) throws IOException {
-
-                for (int i = 0; i < 100; i++) {
-                    outputStream.write((Integer.toString(i) + "QWEWRWEIYRWEUYUREWYRUIWEYRUEYWIRUYWEUIRWEHJFHSDKFHSDJGFSDHGFHSDGFGSDHFGDSHFGSDHGFHSDGFHSDGJFHGSDHFGSDHFGJSDHGFJDHSGFHGSDH - ")
-                            .getBytes());
-                    outputStream.flush();
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        };
-        return ResponseEntity.ok().body(body);
-    }
-
-    @RequestMapping(
-            value = "/test2",
-            method = RequestMethod.GET,
-            produces = MediaType.TEXT_PLAIN_VALUE
-    )
-    public void test2(OutputStream stream) throws IOException, InterruptedException {
-        for (int i = 0; i < 50; i++) {
-            stream.write(("TESTD:JGSDLKJGLSDJGLSDLKGHSDLGHLSDHGLHDSLGHSDLJHGLJDSHGLHSDJLHGFSDFJLSDJFLSDJLFJKDS" + i).getBytes());
-            stream.flush();
-            Thread.sleep(200);
-        }
-    }
+//    @RequestMapping(
+//            value = "/test",
+//            method = RequestMethod.GET,
+//            produces = MediaType.TEXT_PLAIN_VALUE
+//    )
+//    public ResponseEntity<StreamingResponseBody> test(OutputStream stream) {
+//        StreamingResponseBody body = new StreamingResponseBody() {
+//            @Override
+//            public void writeTo(OutputStream outputStream) throws IOException {
+//
+//                for (int i = 0; i < 100; i++) {
+//                    outputStream.write((Integer.toString(i) + "QWEWRWEIYRWEUYUREWYRUIWEYRUEYWIRUYWEUIRWEHJFHSDKFHSDJGFSDHGFHSDGFGSDHFGDSHFGSDHGFHSDGFHSDGJFHGSDHFGSDHFGJSDHGFJDHSGFHGSDH - ")
+//                            .getBytes());
+//                    outputStream.flush();
+//                    try {
+//                        Thread.sleep(200);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        };
+//        return ResponseEntity.ok().body(body);
+//    }
+//
+//    @RequestMapping(
+//            value = "/test2",
+//            method = RequestMethod.GET,
+//            produces = MediaType.TEXT_PLAIN_VALUE
+//    )
+//    public void test2(OutputStream stream) throws IOException, InterruptedException {
+//        for (int i = 0; i < 50; i++) {
+//            stream.write(("TESTD:JGSDLKJGLSDJGLSDLKGHSDLGHLSDHGLHDSLGHSDLJHGLJDSHGLHSDJLHGFSDFJLSDJFLSDJLFJKDS" + i).getBytes());
+//            stream.flush();
+//            Thread.sleep(200);
+//        }
+//    }
 }
