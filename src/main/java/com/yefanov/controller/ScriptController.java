@@ -2,6 +2,8 @@ package com.yefanov.controller;
 
 import com.yefanov.entities.ScriptEntity;
 import com.yefanov.service.ScriptService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.Link;
 import org.springframework.hateoas.mvc.ControllerLinkBuilder;
@@ -19,7 +21,7 @@ import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
 @RestController
 public class ScriptController {
 
-    public static final String CHARSET = "UTF-8";
+    public static final Logger LOGGER = LoggerFactory.getLogger(ScriptController.class);
 
     @Autowired
     private ScriptService scriptService;
@@ -40,23 +42,30 @@ public class ScriptController {
                                                            @RequestParam(value = "async", defaultValue = "false") boolean async
 
     ) throws URISyntaxException {
+        LOGGER.debug("In /scripts by POST request");
         if (body.isEmpty()) {
+            LOGGER.debug("Script is empty, return");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         ScriptEntity entity = scriptService.addScriptToStorage(body);
+        LOGGER.debug("Script added to storage");
         Link link = ControllerLinkBuilder.linkTo(methodOn(ScriptController.class).addScript(body, async)).slash(entity.getId()).withSelfRel();
         if (async) {
+            LOGGER.debug("Script will be executed asyncronously");
 //            CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
 //            return ResponseEntity.accepted().location(new URI(link.getHref())).build();
             StreamingResponseBody respBody = outputStream -> scriptService.executeScriptAsync(entity);
+            LOGGER.debug("Return ResponseEntity");
             return ResponseEntity.accepted().location(new URI(link.getHref())).body(respBody);
         } else {
+            LOGGER.debug("Script will be executed non-asyncronously");
 //            String result = scriptService.executeScript(entity);
 //            return ResponseEntity.created(new URI(link.getHref())).body(result);
             StreamingResponseBody respBody = outputStream -> {
                 entity.setOutputStream(outputStream);
                 scriptService.executeScript(entity);
             };
+            LOGGER.debug("Return ResponseEntity");
             return ResponseEntity.created(new URI(link.getHref())).body(respBody);
         }
     }
@@ -74,17 +83,23 @@ public class ScriptController {
             method = RequestMethod.GET
     )
     public ResponseEntity getStatus(@PathVariable("id") int id) {
+        LOGGER.debug("In /scripts/{id} by GET request");
         ScriptEntity entity = scriptService.getScriptEntityById(id);
         switch (entity.getStatus()) {
             case RUNNING:
+                LOGGER.debug("Script is running");
                 return ResponseEntity.noContent().build();
             case CANCELLED:
+                LOGGER.debug("Script has been cancelled");
                 return ResponseEntity.status(HttpStatus.GONE).build();
             case COMPLETED_EXCEPTIONALLY:
+                LOGGER.debug("Script has been completed exceptionally");
                 return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(entity.getThrownException().getCause().toString());
             case DONE:
+                LOGGER.debug("Script is done");
                 return ResponseEntity.ok(entity.getResult());
         }
+        LOGGER.debug("Return ResponseEntity");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
@@ -98,10 +113,13 @@ public class ScriptController {
             method = RequestMethod.DELETE
     )
     public ResponseEntity cancelScript(@PathVariable("id") int id) {
-        boolean deleted = scriptService.cancelScript(id);
-        if (deleted) {
+        LOGGER.debug("In /scripts/{id} by DELETE request");
+        boolean cancelled = scriptService.cancelScript(id);
+        if (cancelled) {
+            LOGGER.debug("Script has been cancelled");
             return ResponseEntity.ok().build();
         } else {
+            LOGGER.debug("Script hasn't been cancelled");
             return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build();
         }
     }
