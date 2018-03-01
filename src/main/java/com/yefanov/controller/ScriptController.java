@@ -13,9 +13,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import javax.script.Compilable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
 
+import static com.yefanov.service.ScriptServiceImpl.ENGINE_NAME;
 import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
 
 @RestController
@@ -31,13 +37,13 @@ public class ScriptController {
      * @param async
      * @return 202 - script is accepted and will be executed asynchronously
      * 201 - script was executed and result would be returned
-     * 400 - script is empty
+     * 400 - script is empty or not valid
      * @throws URISyntaxException
      */
     @RequestMapping(
             value = "/scripts",
-            method = RequestMethod.POST,
-            produces = MediaType.TEXT_PLAIN_VALUE)
+            method = RequestMethod.POST
+            )
     public ResponseEntity<StreamingResponseBody> addScript(@RequestBody String body,
                                                            @RequestParam(value = "async", defaultValue = "false") boolean async
 
@@ -45,29 +51,37 @@ public class ScriptController {
         LOGGER.debug("In /scripts by POST request");
         if (body.isEmpty()) {
             LOGGER.debug("Script is empty, return");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            return ResponseEntity.badRequest().build();
         }
+        String error = compileAndGetErrorMessage(body);
+        if (error != null) {
+            LOGGER.error("Script isn't valid");
+            return ResponseEntity.badRequest().body(outputStream -> outputStream.write(error.getBytes()));
+        }
+        LOGGER.debug("Script is valid");
         ScriptEntity entity = scriptService.addScriptToStorage(body);
-        LOGGER.debug("Script added to storage");
+        LOGGER.debug("Script added to storage with id {}", entity.getId());
         Link link = ControllerLinkBuilder.linkTo(methodOn(ScriptController.class).addScript(body, async)).slash(entity.getId()).withSelfRel();
         if (async) {
-            LOGGER.debug("Script will be executed asyncronously");
-//            CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
-//            return ResponseEntity.accepted().location(new URI(link.getHref())).build();
-            StreamingResponseBody respBody = outputStream -> scriptService.executeScriptAsync(entity);
-            LOGGER.debug("Return ResponseEntity");
-            return ResponseEntity.accepted().location(new URI(link.getHref())).body(respBody);
+            LOGGER.debug("Script with id {} will be executed asyncronously", entity.getId());
+//            StreamingResponseBody respBody = outputStream -> scriptService.executeScriptAsync(entity);
+            scriptService.executeScriptAsync(entity);
+            return ResponseEntity.accepted().location(new URI(link.getHref())).build();
         } else {
-            LOGGER.debug("Script will be executed non-asyncronously");
-//            String result = scriptService.executeScript(entity);
-//            return ResponseEntity.created(new URI(link.getHref())).body(result);
+            LOGGER.debug("Script with id {} will be executed non-asyncronously", entity.getId());
+            entity.setThread(Thread.currentThread());
             StreamingResponseBody respBody = outputStream -> {
                 entity.setOutputStream(outputStream);
                 scriptService.executeScript(entity);
             };
-            LOGGER.debug("Return ResponseEntity");
-            return ResponseEntity.created(new URI(link.getHref())).body(respBody);
+            return ResponseEntity.created(new URI(link.getHref())).contentType(MediaType.TEXT_PLAIN).body(respBody);
         }
+    }
+
+    @RequestMapping(value = "/scripts", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public List<ScriptEntity> getAllScripts() {
+        return scriptService.getAllScriptEntities();
     }
 
     /**
@@ -76,30 +90,31 @@ public class ScriptController {
      * 410(GONE) - script has been cancelled
      * 406(NOT_ACCEPTABLE) - script has been completed exceptionally
      * 204 - script is still evaluating
-     * 500(INTERNAL_SERVER_ERROR - server error
+     * 404 - script with this id doesn't exist
+     * 500(INTERNAL_SERVER_ERROR) - server error
      */
     @RequestMapping(
             value = "/scripts/{id}",
             method = RequestMethod.GET
     )
     public ResponseEntity getStatus(@PathVariable("id") int id) {
-        LOGGER.debug("In /scripts/{id} by GET request");
+        LOGGER.debug("In /scripts/{} by GET request", id);
         ScriptEntity entity = scriptService.getScriptEntityById(id);
         switch (entity.getStatus()) {
             case RUNNING:
-                LOGGER.debug("Script is running");
+                LOGGER.debug("Script with id {} is running", id);
                 return ResponseEntity.noContent().build();
             case CANCELLED:
-                LOGGER.debug("Script has been cancelled");
+                LOGGER.debug("Script with id {} has been cancelled", id);
                 return ResponseEntity.status(HttpStatus.GONE).build();
             case COMPLETED_EXCEPTIONALLY:
-                LOGGER.debug("Script has been completed exceptionally");
+                LOGGER.debug("Script with id {} has been completed exceptionally", id);
                 return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(entity.getThrownException().getCause().toString());
             case DONE:
-                LOGGER.debug("Script is done");
+                LOGGER.debug("Script with id {} is done", id);
                 return ResponseEntity.ok(entity.getResult());
         }
-        LOGGER.debug("Return ResponseEntity");
+        LOGGER.error("Unexpected status, return INTERNAL_SERVER_ERROR");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
@@ -113,18 +128,29 @@ public class ScriptController {
             method = RequestMethod.DELETE
     )
     public ResponseEntity cancelScript(@PathVariable("id") int id) {
-        LOGGER.debug("In /scripts/{id} by DELETE request");
+        LOGGER.debug("In /scripts/{} by DELETE request", id);
         boolean cancelled = scriptService.cancelScript(id);
         if (cancelled) {
-            LOGGER.debug("Script has been cancelled");
+            LOGGER.debug("Script with id {} has been cancelled", id);
             return ResponseEntity.ok().build();
         } else {
-            LOGGER.debug("Script hasn't been cancelled");
+            LOGGER.debug("Script with id {} hasn't been cancelled", id);
             return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build();
         }
     }
 
-//    @RequestMapping(
+    private String compileAndGetErrorMessage(String script) {
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
+        Compilable compilable = (Compilable) engine;
+        try {
+            compilable.compile(script);
+        } catch (ScriptException e) {
+            return e.getMessage();
+        }
+        return null;
+    }
+
+    //    @RequestMapping(
 //            value = "/test",
 //            method = RequestMethod.GET,
 //            produces = MediaType.TEXT_PLAIN_VALUE

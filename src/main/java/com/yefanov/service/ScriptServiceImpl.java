@@ -18,6 +18,8 @@ import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.time.LocalTime;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -36,34 +38,43 @@ public class ScriptServiceImpl implements ScriptService {
     }
 
     @Override
+    public List<ScriptEntity> getAllScriptEntities() {
+        return storage.getAllScriptEntities();
+    }
+
+    @Override
     public ScriptEntity getScriptEntityById(int id) {
         return storage.getScript(id);
     }
 
     @Override
     public String executeScript(ScriptEntity entity) {
-        LOGGER.debug("Start executing script non-asynchronously");
+        LOGGER.debug("Start executing script with id {} non-asynchronously", entity.getId());
         ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
         try (Writer stringWriter = new StringWriter()){
             OutputStream output = entity.getOutputStream() == null ? System.out : entity.getOutputStream();
-            LOGGER.debug("OutputStream in ScriptEntity has been set");
+            LOGGER.debug("OutputStream in ScriptEntity with id {} has been set", entity.getId());
             OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.forName(CHARSET)), output);
             engine.getContext().setWriter(new OutputStreamWriter(outputStream, Charset.forName(CHARSET)));
-            LOGGER.debug("OutputStream in ScriptEngine has been set");
+            LOGGER.debug("OutputStream in ScriptEngine with id {} has been set", entity.getId());
+            entity.setStartTime(LocalTime.now());
             engine.eval(entity.getScript());
-            LOGGER.debug("Script has been evaluated");
+            entity.setEndTime(LocalTime.now());
+            LOGGER.debug("Script with id {} has been evaluated", entity.getId());
             String consoleOutput = stringWriter.toString();
             entity.setResult(consoleOutput);
-            LOGGER.debug("Result has been set");
+            LOGGER.debug("Result in script with id {} has been set", entity.getId());
             entity.setStatus(ScriptStatus.DONE);
-            LOGGER.debug("Status has been changed");
-            LOGGER.debug("Return output");
+            LOGGER.debug("Status in script with id {} has been changed", entity.getId());
+            LOGGER.debug("Return output of script with id {}", entity.getId());
             return stringWriter.toString();
         } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+            entity.setEndTime(LocalTime.now());
+            LOGGER.error("Error during execution script with id {}, message of exception: {}", entity.getId(), e.getMessage());
             entity.setStatus(ScriptStatus.COMPLETED_EXCEPTIONALLY);
             entity.setThrownException(e);
-            LOGGER.debug("Return error message");
+            entity.setResult(e.getMessage());
+            LOGGER.debug("Script with id {} execution has been finished with exception, return error message", entity.getId());
             return e.getMessage();
         }
     }
@@ -71,29 +82,33 @@ public class ScriptServiceImpl implements ScriptService {
     @Async
     @Override
     public CompletableFuture<String> executeScriptAsync(ScriptEntity script) {
-        LOGGER.debug("Start executing script asynchronously");
+        LOGGER.debug("Start executing script with id {} asynchronously", script.getId());
         CompletableFuture<String> result = new CompletableFuture<>();
         script.setFuture(result);
         result.complete(executeScript(script));
-        LOGGER.debug("Return result");
+        LOGGER.debug("Return result of executing script with id {}", script.getId());
         return result;
     }
 
     @Override
     public boolean cancelScript(int id) {
-        LOGGER.debug("Trying to cancel script");
+        LOGGER.debug("Trying to cancel script with id {}", id);
         ScriptEntity script = storage.getScript(id);
         if (script.getResult() != null) {
-            LOGGER.debug("Script has result, can't be cancelled");
-            LOGGER.debug("Return false");
+            LOGGER.debug("Script with id {} is completed, can't be cancelled", id);
             return false;
+        } else if (script.getThread() != null) {
+            LOGGER.debug("Thread, which is executing script with id {} has been stopped", id);
+            script.getThread().stop();
+            script.setEndTime(LocalTime.now());
+            return true;
         } else {
-            LOGGER.debug("Script has no result");
+            LOGGER.debug("Script with id {} has no result yet", id);
             CompletableFuture<String> future = script.getFuture();
             future.cancel(true);
-            LOGGER.debug("Script has been cancelled");
+            script.setEndTime(LocalTime.now());
+            LOGGER.debug("Script with id {} has been cancelled", id);
             script.setStatus(ScriptStatus.CANCELLED);
-            LOGGER.debug("Return true");
             return true;
         }
     }

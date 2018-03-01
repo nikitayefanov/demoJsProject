@@ -2,11 +2,15 @@ package com.yefanov.storage;
 
 import com.yefanov.entities.ScriptEntity;
 
+import java.util.List;
+
 public interface ScriptStorage {
 
-    public ScriptEntity addScript(String script);
+    ScriptEntity addScript(String script);
 
-    public void removeScript(ScriptEntity script);
+    void removeScript(ScriptEntity script);
 
-    public ScriptEntity getScript(int id);
+    List<ScriptEntity> getAllScriptEntities();
+
+    ScriptEntity getScript(int id);
 }

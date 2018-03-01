@@ -32,10 +32,13 @@ public class ScriptStorageImpl implements ScriptStorage  {
     }
 
     @Override
+    public List<ScriptEntity> getAllScriptEntities() {
+        return scripts;
+    }
+
+    @Override
     public ScriptEntity getScript(int id) {
         LOGGER.debug("Script has been returned");
         return scripts.get(id);
     }
-
-
 }

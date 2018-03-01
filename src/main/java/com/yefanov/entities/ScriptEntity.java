@@ -1,22 +1,37 @@
 package com.yefanov.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.io.OutputStream;
+import java.time.LocalTime;
 import java.util.concurrent.CompletableFuture;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ScriptEntity {
 
     private int id;
 
     private String script;
 
+    private LocalTime startTime;
+
+    private LocalTime endTime;
+
+    @JsonIgnore
     private CompletableFuture<String> future;
 
     private String result;
 
     private ScriptStatus status;
 
+    @JsonIgnore
+    private Thread thread;
+
+    @JsonIgnore
     private Exception thrownException;
 
+    @JsonIgnore
     private OutputStream outputStream;
 
     public ScriptEntity() {
@@ -82,5 +97,29 @@ public class ScriptEntity {
 
     public void setOutputStream(OutputStream outputStream) {
         this.outputStream = outputStream;
+    }
+
+    public LocalTime getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(LocalTime startTime) {
+        this.startTime = startTime;
+    }
+
+    public LocalTime getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(LocalTime endTime) {
+        this.endTime = endTime;
+    }
+
+    public Thread getThread() {
+        return thread;
+    }
+
+    public void setThread(Thread thread) {
+        this.thread = thread;
     }
 }
