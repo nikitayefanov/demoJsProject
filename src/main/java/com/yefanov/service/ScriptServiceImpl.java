@@ -68,6 +68,7 @@ public class ScriptServiceImpl implements ScriptService {
     @Override
     public String executeScript(ScriptEntity entity) {
         LOGGER.debug("Start executing script with id {} non-asynchronously", entity.getId());
+        entity.setThread(Thread.currentThread());
         try {
             OutputStream output = entity.getOutputStream() == null ? System.out : entity.getOutputStream();
             LOGGER.debug("OutputStream in ScriptEntity with id {} has been set", entity.getId());
@@ -130,8 +131,10 @@ public class ScriptServiceImpl implements ScriptService {
                 return true;
             } else {
                 LOGGER.debug("Thread, which is executing script with id {} has been stopped", id);
-                script.getThread().stop();
+                Thread thread = script.getThread();
+                thread.stop();
                 script.setEndTime(new Timestamp(System.currentTimeMillis()));
+                script.setStatus(ScriptStatus.CANCELLED);
                 return true;
             }
         } else {
