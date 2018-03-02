@@ -61,7 +61,6 @@ public class ScriptController {
             return ResponseEntity.accepted().location(new URI(link.getHref())).build();
         } else {
             LOGGER.debug("Script with id {} will be executed non-asynchronously", entity.getId());
-//            entity.setThread(Thread.currentThread());
             StreamingResponseBody respBody = outputStream -> {
                 entity.setOutputStream(outputStream);
                 scriptService.executeScript(entity);
