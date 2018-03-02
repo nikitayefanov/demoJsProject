@@ -40,6 +40,7 @@ public class ServiceTest {
     @Test
     public void executeScriptCorrect() {
         ScriptEntity entity = new ScriptEntity(correctScript);
+        entity.setCompiledScript(scriptService.compileScript(correctScript));
         String res = scriptService.executeScript(entity);
         assertEquals(correctScriptResult, res.trim());
         assertEquals(ScriptStatus.DONE, entity.getStatus());
@@ -69,10 +70,10 @@ public class ServiceTest {
     @Test
     public void executeScriptAsyncCorrect() throws ExecutionException, InterruptedException {
         ScriptEntity entity = new ScriptEntity(correctScript);
+        entity.setCompiledScript(scriptService.compileScript(correctScript));
         CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
         String res = future.get();
         assertNotNull(entity.getFuture());
-        assertNotNull(entity.getResult());
         assertEquals(ScriptStatus.DONE, entity.getStatus());
         assertEquals(correctScriptResult, res.trim());
     }
@@ -83,7 +84,6 @@ public class ServiceTest {
         CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
         String res = future.get();
         assertNotNull(entity.getFuture());
-        assertNotNull(entity.getResult());
         assertEquals(ScriptStatus.COMPLETED_EXCEPTIONALLY, entity.getStatus());
         assertNotNull(entity.getThrownException());
         assertEquals(res, entity.getThrownException().getMessage());
@@ -92,6 +92,7 @@ public class ServiceTest {
     @Test(expected = TimeoutException.class)
     public void executeScriptAsyncEndless() throws ExecutionException, InterruptedException, TimeoutException {
         ScriptEntity entity = new ScriptEntity(endlessScript);
+        entity.setCompiledScript(scriptService.compileScript(endlessScript));
         CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
         future.get(10, TimeUnit.SECONDS);
     }
@@ -107,6 +108,7 @@ public class ServiceTest {
     @Test
     public void cancelScriptTrue() throws InterruptedException {
         ScriptEntity entity = scriptService.addScriptToStorage(endlessScript);
+        entity.setCompiledScript(scriptService.compileScript(endlessScript));
         scriptService.executeScriptAsync(entity);
         Thread.sleep(1);
         assertTrue(scriptService.cancelScript(entity.getId()));

@@ -1,10 +1,14 @@
 package com.yefanov.entities;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import javax.script.CompiledScript;
 import java.io.OutputStream;
-import java.time.LocalTime;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.sql.Timestamp;
 import java.util.concurrent.CompletableFuture;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -14,9 +18,14 @@ public class ScriptEntity {
 
     private String script;
 
-    private LocalTime startTime;
+    @JsonIgnore
+    private CompiledScript compiledScript;
 
-    private LocalTime endTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss.SSS")
+    private Timestamp startTime;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss.SSS")
+    private Timestamp endTime;
 
     @JsonIgnore
     private CompletableFuture<String> future;
@@ -33,6 +42,9 @@ public class ScriptEntity {
 
     @JsonIgnore
     private OutputStream outputStream;
+
+    @JsonIgnore
+    private Writer resultWriter = new StringWriter();
 
     public ScriptEntity() {
         this.status = ScriptStatus.RUNNING;
@@ -99,27 +111,43 @@ public class ScriptEntity {
         this.outputStream = outputStream;
     }
 
-    public LocalTime getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(LocalTime startTime) {
-        this.startTime = startTime;
-    }
-
-    public LocalTime getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(LocalTime endTime) {
-        this.endTime = endTime;
-    }
-
     public Thread getThread() {
         return thread;
     }
 
     public void setThread(Thread thread) {
         this.thread = thread;
+    }
+
+    public Timestamp getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(Timestamp startTime) {
+        this.startTime = startTime;
+    }
+
+    public Timestamp getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(Timestamp endTime) {
+        this.endTime = endTime;
+    }
+
+    public CompiledScript getCompiledScript() {
+        return compiledScript;
+    }
+
+    public void setCompiledScript(CompiledScript compiledScript) {
+        this.compiledScript = compiledScript;
+    }
+
+    public Writer getResultWriter() {
+        return resultWriter;
+    }
+
+    public void setResultWriter(Writer resultWriter) {
+        this.resultWriter = resultWriter;
     }
 }

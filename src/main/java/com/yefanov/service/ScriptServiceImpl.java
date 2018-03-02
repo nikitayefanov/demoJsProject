@@ -2,6 +2,7 @@ package com.yefanov.service;
 
 import com.yefanov.entities.ScriptEntity;
 import com.yefanov.entities.ScriptStatus;
+import com.yefanov.exceptions.ScriptParsingException;
 import com.yefanov.storage.ScriptStorage;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.apache.commons.io.output.WriterOutputStream;
@@ -11,65 +12,81 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
+import javax.script.*;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.nio.charset.Charset;
-import java.time.LocalTime;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
+@SuppressWarnings("all")
 public class ScriptServiceImpl implements ScriptService {
 
-    public static final String CHARSET = "UTF-8";
-    public static final String ENGINE_NAME = "nashorn";
-    public static final Logger LOGGER = LoggerFactory.getLogger(ScriptServiceImpl.class);
+    private static final String CHARSET = "UTF-8";
+    private static final String ENGINE_NAME = "nashorn";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ScriptServiceImpl.class);
 
     @Autowired
     private ScriptStorage storage;
 
+    /**
+     * @param script javascript
+     * @return ScriptEntity from transmitted script
+     */
     @Override
     public ScriptEntity addScriptToStorage(String script) {
         return storage.addScript(script);
     }
 
+    /**
+     * @return all scripts
+     */
     @Override
     public List<ScriptEntity> getAllScriptEntities() {
-        return storage.getAllScriptEntities();
+        List<ScriptEntity> allScriptEntities = storage.getAllScriptEntities();
+        for (ScriptEntity s: allScriptEntities) {
+            s.setResult(s.getResultWriter().toString());
+        }
+        return allScriptEntities;
     }
 
+    /**
+     * @param id script id
+     * @return ScriptEntity from storage
+     */
     @Override
     public ScriptEntity getScriptEntityById(int id) {
         return storage.getScript(id);
     }
 
+    /**
+     * @param entity script entity to execute
+     * @return output of transmitted script
+     */
     @Override
     public String executeScript(ScriptEntity entity) {
         LOGGER.debug("Start executing script with id {} non-asynchronously", entity.getId());
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
-        try (Writer stringWriter = new StringWriter()){
+        try {
             OutputStream output = entity.getOutputStream() == null ? System.out : entity.getOutputStream();
             LOGGER.debug("OutputStream in ScriptEntity with id {} has been set", entity.getId());
-            OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(stringWriter, Charset.forName(CHARSET)), output);
-            engine.getContext().setWriter(new OutputStreamWriter(outputStream, Charset.forName(CHARSET)));
+            OutputStream outputStream = new TeeOutputStream(new WriterOutputStream(entity.getResultWriter(), Charset.forName(CHARSET)), output);
+            entity.getCompiledScript().getEngine().getContext().setWriter(new OutputStreamWriter(outputStream, Charset.forName(CHARSET)));
             LOGGER.debug("OutputStream in ScriptEngine with id {} has been set", entity.getId());
-            entity.setStartTime(LocalTime.now());
-            engine.eval(entity.getScript());
-            entity.setEndTime(LocalTime.now());
+            entity.setStartTime(new Timestamp(System.currentTimeMillis()));
+            entity.getCompiledScript().eval();
+            entity.setEndTime(new Timestamp(System.currentTimeMillis()));
             LOGGER.debug("Script with id {} has been evaluated", entity.getId());
-            String consoleOutput = stringWriter.toString();
+            String consoleOutput = entity.getResultWriter().toString();
             entity.setResult(consoleOutput);
             LOGGER.debug("Result in script with id {} has been set", entity.getId());
             entity.setStatus(ScriptStatus.DONE);
             LOGGER.debug("Status in script with id {} has been changed", entity.getId());
             LOGGER.debug("Return output of script with id {}", entity.getId());
-            return stringWriter.toString();
+            return entity.getResultWriter().toString();
         } catch (Exception e) {
-            entity.setEndTime(LocalTime.now());
+            entity.setEndTime(new Timestamp(System.currentTimeMillis()));
             LOGGER.error("Error during execution script with id {}, message of exception: {}", entity.getId(), e.getMessage());
             entity.setStatus(ScriptStatus.COMPLETED_EXCEPTIONALLY);
             entity.setThrownException(e);
@@ -79,6 +96,10 @@ public class ScriptServiceImpl implements ScriptService {
         }
     }
 
+    /**
+     * @param script script entity to execute
+     * @return CompletableFuture of execution
+     */
     @Async
     @Override
     public CompletableFuture<String> executeScriptAsync(ScriptEntity script) {
@@ -90,26 +111,51 @@ public class ScriptServiceImpl implements ScriptService {
         return result;
     }
 
+    /**
+     * @param id script id
+     * @return true if cancellation is successful, false if not
+     */
     @Override
     public boolean cancelScript(int id) {
         LOGGER.debug("Trying to cancel script with id {}", id);
         ScriptEntity script = storage.getScript(id);
-        if (script.getResult() != null) {
+        if (script.getStatus() == ScriptStatus.RUNNING) {
+            if (script.getFuture() != null) {
+                LOGGER.debug("Script with id {} hasn't finished yet", id);
+                CompletableFuture<String> future = script.getFuture();
+                future.cancel(true);
+                script.setEndTime(new Timestamp(System.currentTimeMillis()));
+                LOGGER.debug("Script with id {} has been cancelled", id);
+                script.setStatus(ScriptStatus.CANCELLED);
+                return true;
+            } else {
+                LOGGER.debug("Thread, which is executing script with id {} has been stopped", id);
+                script.getThread().stop();
+                script.setEndTime(new Timestamp(System.currentTimeMillis()));
+                return true;
+            }
+        } else {
             LOGGER.debug("Script with id {} is completed, can't be cancelled", id);
             return false;
-        } else if (script.getThread() != null) {
-            LOGGER.debug("Thread, which is executing script with id {} has been stopped", id);
-            script.getThread().stop();
-            script.setEndTime(LocalTime.now());
-            return true;
-        } else {
-            LOGGER.debug("Script with id {} has no result yet", id);
-            CompletableFuture<String> future = script.getFuture();
-            future.cancel(true);
-            script.setEndTime(LocalTime.now());
-            LOGGER.debug("Script with id {} has been cancelled", id);
-            script.setStatus(ScriptStatus.CANCELLED);
-            return true;
+        }
+    }
+
+    /**
+     * @param script script to compile
+     * @return compiled script
+     */
+    @Override
+    public CompiledScript compileScript(String script) {
+        LOGGER.debug("Start compiling script");
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
+        Compilable compilable = (Compilable) engine;
+        try {
+            return compilable.compile(script);
+        } catch (ScriptException e) {
+            LOGGER.error("Script isn't valid, exception thrown");
+            throw new ScriptParsingException(e);
+        } finally {
+            LOGGER.debug("Script has been compiled");
         }
     }
 }

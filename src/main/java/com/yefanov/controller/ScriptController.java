@@ -13,37 +13,33 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import javax.script.Compilable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
+import javax.script.CompiledScript;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
-import static com.yefanov.service.ScriptServiceImpl.ENGINE_NAME;
 import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
 
 @RestController
 public class ScriptController {
 
-    public static final Logger LOGGER = LoggerFactory.getLogger(ScriptController.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ScriptController.class);
 
     @Autowired
     private ScriptService scriptService;
 
     /**
-     * @param body
-     * @param async
+     * @param body  script to execute
+     * @param async should script be executed async or not, default - not
      * @return 202 - script is accepted and will be executed asynchronously
      * 201 - script was executed and result would be returned
      * 400 - script is empty or not valid
-     * @throws URISyntaxException
+     * @throws URISyntaxException string could not be parsed as a URI reference
      */
     @RequestMapping(
             value = "/scripts",
             method = RequestMethod.POST
-            )
+    )
     public ResponseEntity<StreamingResponseBody> addScript(@RequestBody String body,
                                                            @RequestParam(value = "async", defaultValue = "false") boolean async
 
@@ -53,22 +49,18 @@ public class ScriptController {
             LOGGER.debug("Script is empty, return");
             return ResponseEntity.badRequest().build();
         }
-        String error = compileAndGetErrorMessage(body);
-        if (error != null) {
-            LOGGER.error("Script isn't valid");
-            return ResponseEntity.badRequest().body(outputStream -> outputStream.write(error.getBytes()));
-        }
+        CompiledScript compiledScript = scriptService.compileScript(body);
         LOGGER.debug("Script is valid");
         ScriptEntity entity = scriptService.addScriptToStorage(body);
         LOGGER.debug("Script added to storage with id {}", entity.getId());
+        entity.setCompiledScript(compiledScript);
         Link link = ControllerLinkBuilder.linkTo(methodOn(ScriptController.class).addScript(body, async)).slash(entity.getId()).withSelfRel();
         if (async) {
-            LOGGER.debug("Script with id {} will be executed asyncronously", entity.getId());
-//            StreamingResponseBody respBody = outputStream -> scriptService.executeScriptAsync(entity);
+            LOGGER.debug("Script with id {} will be executed asynchronously", entity.getId());
             scriptService.executeScriptAsync(entity);
             return ResponseEntity.accepted().location(new URI(link.getHref())).build();
         } else {
-            LOGGER.debug("Script with id {} will be executed non-asyncronously", entity.getId());
+            LOGGER.debug("Script with id {} will be executed non-asynchronously", entity.getId());
             entity.setThread(Thread.currentThread());
             StreamingResponseBody respBody = outputStream -> {
                 entity.setOutputStream(outputStream);
@@ -78,6 +70,10 @@ public class ScriptController {
         }
     }
 
+    /**
+     *
+     * @return all scripts
+     */
     @RequestMapping(value = "/scripts", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<ScriptEntity> getAllScripts() {
@@ -85,13 +81,11 @@ public class ScriptController {
     }
 
     /**
-     * @param id
-     * @return 200 - script output
-     * 410(GONE) - script has been cancelled
-     * 406(NOT_ACCEPTABLE) - script has been completed exceptionally
-     * 204 - script is still evaluating
-     * 404 - script with this id doesn't exist
-     * 500(INTERNAL_SERVER_ERROR) - server error
+     * @param id script id
+     * @return 200 - script is done
+     * 202 - script is still evaluating
+     * 410 - script has been cancelled
+     * 406 - script has been completed exceptionally
      */
     @RequestMapping(
             value = "/scripts/{id}",
@@ -100,27 +94,30 @@ public class ScriptController {
     public ResponseEntity getStatus(@PathVariable("id") int id) {
         LOGGER.debug("In /scripts/{} by GET request", id);
         ScriptEntity entity = scriptService.getScriptEntityById(id);
+        LOGGER.debug("Current output for script with id {} has been set", id);
+        entity.setResult(entity.getResultWriter().toString());
         switch (entity.getStatus()) {
             case RUNNING:
                 LOGGER.debug("Script with id {} is running", id);
-                return ResponseEntity.noContent().build();
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(entity);
             case CANCELLED:
                 LOGGER.debug("Script with id {} has been cancelled", id);
-                return ResponseEntity.status(HttpStatus.GONE).build();
+                return ResponseEntity.status(HttpStatus.GONE).body(entity);
             case COMPLETED_EXCEPTIONALLY:
                 LOGGER.debug("Script with id {} has been completed exceptionally", id);
-                return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(entity.getThrownException().getCause().toString());
+                return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(entity);
             case DONE:
                 LOGGER.debug("Script with id {} is done", id);
-                return ResponseEntity.ok(entity.getResult());
+                return ResponseEntity.ok(entity);
+            default:
+                LOGGER.error("Unexpected status, exception thrown");
+                throw new IllegalStateException();
         }
-        LOGGER.error("Unexpected status, return INTERNAL_SERVER_ERROR");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
     /**
-     * @param id
-     * @return 406(NOT_ACCEPTABLE) - script has already been executed
+     * @param id script id
+     * @return 406 - script has already been executed
      * 200 - script has been cancelled successfully
      */
     @RequestMapping(
@@ -138,53 +135,4 @@ public class ScriptController {
             return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build();
         }
     }
-
-    private String compileAndGetErrorMessage(String script) {
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
-        Compilable compilable = (Compilable) engine;
-        try {
-            compilable.compile(script);
-        } catch (ScriptException e) {
-            return e.getMessage();
-        }
-        return null;
-    }
-
-    //    @RequestMapping(
-//            value = "/test",
-//            method = RequestMethod.GET,
-//            produces = MediaType.TEXT_PLAIN_VALUE
-//    )
-//    public ResponseEntity<StreamingResponseBody> test(OutputStream stream) {
-//        StreamingResponseBody body = new StreamingResponseBody() {
-//            @Override
-//            public void writeTo(OutputStream outputStream) throws IOException {
-//
-//                for (int i = 0; i < 100; i++) {
-//                    outputStream.write((Integer.toString(i) + "QWEWRWEIYRWEUYUREWYRUIWEYRUEYWIRUYWEUIRWEHJFHSDKFHSDJGFSDHGFHSDGFGSDHFGDSHFGSDHGFHSDGFHSDGJFHGSDHFGSDHFGJSDHGFJDHSGFHGSDH - ")
-//                            .getBytes());
-//                    outputStream.flush();
-//                    try {
-//                        Thread.sleep(200);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        };
-//        return ResponseEntity.ok().body(body);
-//    }
-//
-//    @RequestMapping(
-//            value = "/test2",
-//            method = RequestMethod.GET,
-//            produces = MediaType.TEXT_PLAIN_VALUE
-//    )
-//    public void test2(OutputStream stream) throws IOException, InterruptedException {
-//        for (int i = 0; i < 50; i++) {
-//            stream.write(("TESTD:JGSDLKJGLSDJGLSDLKGHSDLGHLSDHGLHDSLGHSDLJHGLJDSHGLHSDJLHGFSDFJLSDJFLSDJLFJKDS" + i).getBytes());
-//            stream.flush();
-//            Thread.sleep(200);
-//        }
-//    }
 }

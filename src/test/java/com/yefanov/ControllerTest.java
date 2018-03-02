@@ -62,7 +62,7 @@ public class ControllerTest {
         ScriptEntity entity = new ScriptEntity(errorScript);
         when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=false").content(errorScript)).andReturn();
-        assertEquals(HttpStatus.BAD_REQUEST.value(), result.getResponse().getStatus());
+        assertEquals(HttpStatus.CREATED.value(), result.getResponse().getStatus());
     }
 
     @Test
@@ -78,7 +78,7 @@ public class ControllerTest {
         ScriptEntity entity = new ScriptEntity(errorScript);
         when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=true").content(errorScript)).andReturn();
-        assertEquals(HttpStatus.BAD_REQUEST.value(), result.getResponse().getStatus());
+        assertEquals(HttpStatus.ACCEPTED.value(), result.getResponse().getStatus());
     }
 
     @Test
@@ -96,7 +96,7 @@ public class ControllerTest {
         entity.setStatus(ScriptStatus.RUNNING);
         when(scriptService.getScriptEntityById(entity.getId())).thenReturn(entity);
         MvcResult result = mockMvc.perform(get("/scripts/{id}", entity.getId())).andReturn();
-        assertEquals(HttpStatus.NO_CONTENT.value(), result.getResponse().getStatus());
+        assertEquals(HttpStatus.ACCEPTED.value(), result.getResponse().getStatus());
     }
 
     @Test
