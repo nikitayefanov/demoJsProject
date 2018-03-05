@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Implementation of ScriptStorage interface
+ * @see ScriptStorage
+ */
 @Component
 public class ScriptStorageImpl implements ScriptStorage  {
 
@@ -18,7 +22,7 @@ public class ScriptStorageImpl implements ScriptStorage  {
 
     /**
      * @param s script to add
-     * @return ScriptEntity, containing transmitted script
+     * @return ScriptEntity, containing this script
      */
     @Override
     public ScriptEntity addScript(String s) {
@@ -49,7 +53,7 @@ public class ScriptStorageImpl implements ScriptStorage  {
 
     /**
      * @param id script id
-     * @return script entity with transmitted id
+     * @return script entity with such id
      */
     @Override
     public ScriptEntity getScript(int id) {

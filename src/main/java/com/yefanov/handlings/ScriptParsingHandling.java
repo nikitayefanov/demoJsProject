@@ -8,6 +8,10 @@ import org.zalando.problem.Problem;
 import org.zalando.problem.Status;
 import org.zalando.problem.spring.web.advice.AdviceTrait;
 
+/**
+ * Handling for ScriptParsingException
+ * @see ScriptParsingException
+ */
 public interface ScriptParsingHandling extends AdviceTrait {
 
     @ExceptionHandler

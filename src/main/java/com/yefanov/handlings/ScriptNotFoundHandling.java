@@ -8,6 +8,10 @@ import org.zalando.problem.Problem;
 import org.zalando.problem.Status;
 import org.zalando.problem.spring.web.advice.AdviceTrait;
 
+/**
+ * Handling for ScriptNotFoundException
+ * @see ScriptNotFoundException
+ */
 public interface ScriptNotFoundHandling extends AdviceTrait {
 
     @ExceptionHandler

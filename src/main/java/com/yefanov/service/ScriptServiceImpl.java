@@ -20,8 +20,11 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Implementation of ScriptService interface
+ * @see ScriptService
+ */
 @Service
-@SuppressWarnings("all")
 public class ScriptServiceImpl implements ScriptService {
 
     private static final String CHARSET = "UTF-8";
@@ -32,12 +35,27 @@ public class ScriptServiceImpl implements ScriptService {
     private ScriptStorage storage;
 
     /**
-     * @param script javascript
-     * @return ScriptEntity from transmitted script
+     * @param script script text
+     * @return ScriptEntity
+     * @see ScriptEntity
      */
     @Override
-    public ScriptEntity addScriptToStorage(String script) {
-        return storage.addScript(script);
+    public ScriptEntity create(String script) {
+        LOGGER.debug("Start compiling script");
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
+        Compilable compilable = (Compilable) engine;
+        CompiledScript compiledScript;
+        try {
+            compiledScript = compilable.compile(script);
+        } catch (ScriptException e) {
+            LOGGER.error("Script isn't valid, exception thrown");
+            throw new ScriptParsingException(e);
+        }
+        LOGGER.debug("Script has been compiled");
+        ScriptEntity entity = storage.addScript(script);
+        entity.setCompiledScript(compiledScript);
+        LOGGER.debug("Script with id {} has been created", entity.getId());
+        return entity;
     }
 
     /**
@@ -46,7 +64,7 @@ public class ScriptServiceImpl implements ScriptService {
     @Override
     public List<ScriptEntity> getAllScriptEntities() {
         List<ScriptEntity> allScriptEntities = storage.getAllScriptEntities();
-        for (ScriptEntity s: allScriptEntities) {
+        for (ScriptEntity s : allScriptEntities) {
             s.setResult(s.getResultWriter().toString());
         }
         return allScriptEntities;
@@ -117,48 +135,20 @@ public class ScriptServiceImpl implements ScriptService {
      * @return true if cancellation is successful, false if not
      */
     @Override
+    @SuppressWarnings("deprecation")
     public boolean cancelScript(int id) {
         LOGGER.debug("Trying to cancel script with id {}", id);
         ScriptEntity script = storage.getScript(id);
         if (script.getStatus() == ScriptStatus.RUNNING) {
-            if (script.getFuture() != null) {
-                LOGGER.debug("Script with id {} hasn't finished yet", id);
-                CompletableFuture<String> future = script.getFuture();
-                future.cancel(true);
-                script.setEndTime(new Timestamp(System.currentTimeMillis()));
-                LOGGER.debug("Script with id {} has been cancelled", id);
-                script.setStatus(ScriptStatus.CANCELLED);
-                return true;
-            } else {
-                LOGGER.debug("Thread, which is executing script with id {} has been stopped", id);
-                Thread thread = script.getThread();
-                thread.stop();
-                script.setEndTime(new Timestamp(System.currentTimeMillis()));
-                script.setStatus(ScriptStatus.CANCELLED);
-                return true;
-            }
+            LOGGER.debug("Script with id {} hasn't finished yet", id);
+            script.getThread().stop();
+            script.setEndTime(new Timestamp(System.currentTimeMillis()));
+            LOGGER.debug("Script with id {} has been cancelled", id);
+            script.setStatus(ScriptStatus.CANCELLED);
+            return true;
         } else {
             LOGGER.debug("Script with id {} is completed, can't be cancelled", id);
             return false;
-        }
-    }
-
-    /**
-     * @param script script to compile
-     * @return compiled script
-     */
-    @Override
-    public CompiledScript compileScript(String script) {
-        LOGGER.debug("Start compiling script");
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName(ENGINE_NAME);
-        Compilable compilable = (Compilable) engine;
-        try {
-            return compilable.compile(script);
-        } catch (ScriptException e) {
-            LOGGER.error("Script isn't valid, exception thrown");
-            throw new ScriptParsingException(e);
-        } finally {
-            LOGGER.debug("Script has been compiled");
         }
     }
 }

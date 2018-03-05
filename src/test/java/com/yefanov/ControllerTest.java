@@ -46,7 +46,7 @@ public class ControllerTest {
     @Test
     public void correctNonAsyncScript() throws Exception {
         ScriptEntity entity = new ScriptEntity(correctScript);
-        when(scriptService.addScriptToStorage(entity.getScript())).thenReturn(entity);
+        when(scriptService.create(entity.getScript())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=false").content(correctScript)).andReturn();
         assertEquals(HttpStatus.CREATED.value(), result.getResponse().getStatus());
     }
@@ -60,7 +60,7 @@ public class ControllerTest {
     @Test
     public void errorNonAsyncScript() throws Exception {
         ScriptEntity entity = new ScriptEntity(errorScript);
-        when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
+        when(scriptService.create(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=false").content(errorScript)).andReturn();
         assertEquals(HttpStatus.CREATED.value(), result.getResponse().getStatus());
     }
@@ -68,7 +68,7 @@ public class ControllerTest {
     @Test
     public void correctAsyncScript() throws Exception {
         ScriptEntity entity = new ScriptEntity(correctScript);
-        when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
+        when(scriptService.create(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=true").content(correctScript)).andReturn();
         assertEquals(HttpStatus.ACCEPTED.value(), result.getResponse().getStatus());
     }
@@ -76,7 +76,7 @@ public class ControllerTest {
     @Test
     public void errorAsyncScript() throws Exception {
         ScriptEntity entity = new ScriptEntity(errorScript);
-        when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
+        when(scriptService.create(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=true").content(errorScript)).andReturn();
         assertEquals(HttpStatus.ACCEPTED.value(), result.getResponse().getStatus());
     }
@@ -84,7 +84,7 @@ public class ControllerTest {
     @Test
     public void endlessAsyncScript() throws Exception {
         ScriptEntity entity = new ScriptEntity(endlessScript);
-        when(scriptService.addScriptToStorage(anyString())).thenReturn(entity);
+        when(scriptService.create(anyString())).thenReturn(entity);
         MvcResult result = mockMvc.perform(post("/scripts?async=true").content(endlessScript)).andReturn();
         assertEquals(HttpStatus.ACCEPTED.value(), result.getResponse().getStatus());
     }

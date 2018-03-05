@@ -11,6 +11,9 @@ import java.io.Writer;
 import java.sql.Timestamp;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Class, encapsulating information about script
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ScriptEntity {
 
@@ -80,7 +83,10 @@ public class ScriptEntity {
     }
 
     public String getResult() {
-        return result;
+        if (this.status == ScriptStatus.RUNNING) {
+            return this.resultWriter.toString();
+        }
+        return this.result;
     }
 
     public void setResult(String result) {

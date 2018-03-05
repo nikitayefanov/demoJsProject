@@ -1,5 +1,8 @@
 package com.yefanov.exceptions;
 
+/**
+ * Thrown to indicate that script syntax is invalid
+ */
 public class ScriptParsingException extends RuntimeException{
 
     public ScriptParsingException() {

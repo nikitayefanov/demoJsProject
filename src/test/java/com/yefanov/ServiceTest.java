@@ -20,7 +20,7 @@ import static org.junit.Assert.*;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 public class ServiceTest {
 
     @Value("${empty_script}")
@@ -39,8 +39,7 @@ public class ServiceTest {
 
     @Test
     public void executeScriptCorrect() {
-        ScriptEntity entity = new ScriptEntity(correctScript);
-        entity.setCompiledScript(scriptService.compileScript(correctScript));
+        ScriptEntity entity = scriptService.create(correctScript);
         String res = scriptService.executeScript(entity);
         assertEquals(correctScriptResult, res.trim());
         assertEquals(ScriptStatus.DONE, entity.getStatus());
@@ -57,10 +56,10 @@ public class ServiceTest {
 
     @Test
     public void addScript() {
-        ScriptEntity entity1 = new ScriptEntity("Test 1");
-        ScriptEntity entity2 = new ScriptEntity("Test 2");
-        ScriptEntity res1 = scriptService.addScriptToStorage(entity1.getScript());
-        ScriptEntity res2 = scriptService.addScriptToStorage(entity2.getScript());
+        ScriptEntity entity1 = new ScriptEntity(correctScript);
+        ScriptEntity entity2 = new ScriptEntity(correctScript);
+        ScriptEntity res1 = scriptService.create(entity1.getScript());
+        ScriptEntity res2 = scriptService.create(entity2.getScript());
         assertEquals(0, res1.getId());
         assertEquals(1, res2.getId());
         assertEquals(entity1.getScript(), res1.getScript());
@@ -69,8 +68,7 @@ public class ServiceTest {
 
     @Test
     public void executeScriptAsyncCorrect() throws ExecutionException, InterruptedException {
-        ScriptEntity entity = new ScriptEntity(correctScript);
-        entity.setCompiledScript(scriptService.compileScript(correctScript));
+        ScriptEntity entity = scriptService.create(correctScript);
         CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
         String res = future.get();
         assertNotNull(entity.getFuture());
@@ -91,15 +89,14 @@ public class ServiceTest {
 
     @Test(expected = TimeoutException.class)
     public void executeScriptAsyncEndless() throws ExecutionException, InterruptedException, TimeoutException {
-        ScriptEntity entity = new ScriptEntity(endlessScript);
-        entity.setCompiledScript(scriptService.compileScript(endlessScript));
+        ScriptEntity entity = scriptService.create(endlessScript);
         CompletableFuture<String> future = scriptService.executeScriptAsync(entity);
         future.get(10, TimeUnit.SECONDS);
     }
 
     @Test
     public void cancelScriptFalse() {
-        ScriptEntity entity = scriptService.addScriptToStorage(correctScript);
+        ScriptEntity entity = scriptService.create(correctScript);
         scriptService.executeScript(entity);
         assertFalse(scriptService.cancelScript(entity.getId()));
         assertNotEquals(ScriptStatus.CANCELLED, entity.getStatus());
@@ -107,11 +104,36 @@ public class ServiceTest {
 
     @Test
     public void cancelScriptTrue() throws InterruptedException {
-        ScriptEntity entity = scriptService.addScriptToStorage(endlessScript);
-        entity.setCompiledScript(scriptService.compileScript(endlessScript));
+        ScriptEntity entity = scriptService.create(endlessScript);
         scriptService.executeScriptAsync(entity);
-        Thread.sleep(1);
+        Thread.sleep(10);
         assertTrue(scriptService.cancelScript(entity.getId()));
         assertEquals(ScriptStatus.CANCELLED, entity.getStatus());
+    }
+
+    @Test
+    public void threadState() throws InterruptedException {
+        ScriptEntity entity = scriptService.create(endlessScript);
+        scriptService.executeScriptAsync(entity);
+        Thread.sleep(100);
+        Thread.State state = entity.getThread().getState();
+        assertEquals(Thread.State.RUNNABLE, state);
+        scriptService.cancelScript(entity.getId());
+        Thread.sleep(100);
+        assertEquals(true, entity.getThread().isAlive());
+    }
+
+    @Test
+    public void threadQueue() throws InterruptedException {
+        for (int i = 0; i < 10; i++) {
+            ScriptEntity entity = scriptService.create(endlessScript);
+            scriptService.executeScriptAsync(entity);
+        }
+        Thread.sleep(100);
+        ScriptEntity entity = scriptService.getScriptEntityById(5);
+        assertNull(entity.getThread());
+        scriptService.cancelScript(0);
+        Thread.sleep(100);
+        assertEquals(true, entity.getThread().isAlive());
     }
 }

@@ -1,5 +1,8 @@
 package com.yefanov.exceptions;
 
+/**
+ * Thrown to indicate that script with such id doesn't exist
+ */
 public class ScriptNotFoundException extends RuntimeException {
 
     public ScriptNotFoundException(String message) {
