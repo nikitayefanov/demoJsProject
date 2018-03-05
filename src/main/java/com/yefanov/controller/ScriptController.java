@@ -54,7 +54,7 @@ public class ScriptController {
         }
         ScriptEntity entity = scriptService.create(body);
         LOGGER.debug("Script is valid and added to storage with id {}", entity.getId());
-        Link link = ControllerLinkBuilder.linkTo(methodOn(ScriptController.class).addScript(body, async)).slash(entity.getId()).withSelfRel();
+        Link link = ControllerLinkBuilder.linkTo(methodOn(ScriptController.class).getStatus(entity.getId())).withSelfRel();
         if (async) {
             LOGGER.debug("Script with id {} will be executed asynchronously", entity.getId());
             scriptService.executeScriptAsync(entity);
