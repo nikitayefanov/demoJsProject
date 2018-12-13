@@ -39,6 +39,7 @@ public class ScriptController {
      * 400 - script is empty or not valid
      * @throws URISyntaxException string could not be parsed as a URI reference
      */
+    @CrossOrigin
     @RequestMapping(
             value = "/scripts",
             method = RequestMethod.POST
@@ -73,6 +74,7 @@ public class ScriptController {
      * Returns all scripts
      * @return all scripts
      */
+    @CrossOrigin
     @RequestMapping(value = "/scripts", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<ScriptEntity> getAllScripts() {
@@ -87,6 +89,7 @@ public class ScriptController {
      * 410 - script has been cancelled
      * 406 - script has been completed exceptionally
      */
+    @CrossOrigin
     @RequestMapping(
             value = "/scripts/{id}",
             method = RequestMethod.GET
@@ -121,6 +124,7 @@ public class ScriptController {
      * @return 406 - script has already been executed
      * 200 - script has been cancelled successfully
      */
+    @CrossOrigin
     @RequestMapping(
             value = "/scripts/{id}",
             method = RequestMethod.DELETE
